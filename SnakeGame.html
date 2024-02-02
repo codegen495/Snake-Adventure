@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Snake Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #282c34;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            border: 2px solid #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        #score {
+            font-size: 24px;
+            margin-top: 20px;
+        }
+
+        #gameOverScreen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1;
+        }
+
+        .game-over-text {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #ff4500; /* Dark Orange */
+        }
+
+        .game-over-score {
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+
+        .restart-button {
+            background-color: #61dafb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .instructions {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .obstacle {
+            background-color: #333;
+        }
+
+        .power-up {
+            background-color: #ffcc00; /* Yellow */
+            color: #333;
+        }
+
+        .teleporter {
+            background-color: #9932cc; /* Dark Orchid */
+        }
+
+        .special-food {
+            background-color: #ff6347; /* Tomato */
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <h1>Advanced Snake Game</h1>
+        <div class="instructions">
+            <p>Use arrow keys to control the snake. Eat food to grow and score points.</p>
+            <p>Avoid collisions with obstacles and the snake's own body.</p>
+            <p>Power-ups, teleporters, and special food provide additional challenges and rewards.</p>
+        </div>
+        <canvas id="snakeCanvas" width="400" height="400"></canvas>
+        <div id="score">Score: 0 | Level: 1</div>
+
+        <div id="gameOverScreen">
+            <div class="game-over-text">Game Over!</div>
+            <div id="gameOverScore" class="game-over-score"></div>
+            <button class="restart-button" onclick="restartGame()">Restart</button>
+        </div>
+    </div>
+
+    <script>
+        // Advanced Snake Game JavaScript
+
+        const canvas = document.getElementById('snakeCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const gameOverScoreDisplay = document.getElementById('gameOverScore');
+
+        const gridSize = 20;
+        const snake = [{ x: 0, y: 0 }];
+        let direction = 'right';
+        let food = generateFood();
+        let score = 0;
+        let speed = 150; // Lower values increase speed
+        let level = 1;
+        let obstacles = [];
+        let powerUps = [];
+        let teleporters = [];
+        let specialFood = { x: -1, y: -1 };
+
+        function draw() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw obstacles
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = '#333';
+                ctx.fillRect(obstacle.x, obstacle.y, gridSize, gridSize);
+            });
+
+            // Draw power-ups
+            powerUps.forEach(powerUp => {
+                ctx.fillStyle = '#ffcc00'; // Yellow
+                ctx.fillRect(powerUp.x, powerUp.y, gridSize, gridSize);
+            });
+
+            // Draw teleporters
+            teleporters.forEach(teleporter => {
+                ctx.fillStyle = '#9932cc'; // Dark Orchid
+                ctx.fillRect(teleporter.x, teleporter.y, gridSize, gridSize);
+            });
+
+            // Draw special food
+            if (specialFood.x !== -1 && specialFood.y !== -1) {
+                ctx.fillStyle = '#ff6347'; // Tomato
+                ctx.fillRect(specialFood.x, specialFood.y, gridSize, gridSize);
+            }
+
+            // Draw food
+            ctx.fillStyle = '#ff6347'; // Tomato color
+            ctx.fillRect(food.x, food.y, gridSize, gridSize);
+
+            // Draw snake
+            ctx.fillStyle = '#00ced1'; // Dark Turquoise color
+            snake.forEach(segment => {
+                ctx.fillRect(segment.x, segment.y, gridSize, gridSize);
+            });
+        }
+
+        function update() {
+            const head = { ...snake[0] };
+
+            // Update snake direction
+            switch (direction) {
+                case 'up':
+                    head.y -= gridSize;
+                    break;
+                case 'down':
+                    head.y += gridSize;
+                    break;
+                case 'left':
+                    head.x -= gridSize;
+                    break;
+                case 'right':
+                    head.x += gridSize;
+                    break;
+            }
+
+            // Check if snake eats food
+            if (head.x === food.x && head.y === food.y) {
+                snake.unshift({ ...head }); // Add new head to the snake
+                food = generateFood(); // Generate new food
+                score++;
+                scoreDisplay.textContent = `Score: ${score} | Level: ${level}`;
+                speed -= 5; // Increase speed after eating food
+                if (score % 5 === 0) {
+                    level++;
+                    speed -= 20; // Increase speed every 5 points
+                    alert(`Level ${level} reached!`);
+                }
+                generatePowerUp();
+                generateTeleporter();
+                generateSpecialFood();
+            } else {
+                // Remove the tail
+                snake.pop();
+                // Check for collisions with walls, itself, or obstacles
+                if (
+                    head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height ||
+                    checkCollision(head) || checkObstacleCollision(head)
+                ) {
+                    // Game over
+                    showGameOverScreen();
+                    return;
+                }
+                // Check for collisions with power-ups
+                checkPowerUpCollision(head);
+                // Check for collisions with teleporters
+                checkTeleporterCollision(head);
+                // Check for collisions with special food
+                checkSpecialFoodCollision(head);
+                // Add new head to the snake
+                snake.unshift({ ...head });
+            }
+        }
+
+        function generateFood() {
+            const x = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+            const y = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
+            return { x, y };
+        }
+
+        function generateObstacle() {
+            const x = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+            const y = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
+            obstacles.push({ x, y });
+        }
+
+        function generatePowerUp() {
+            const x = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+            const y = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
+            powerUps.push({ x, y });
+        }
+
+        function generateTeleporter() {
+            const x = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+            const y = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
+            teleporters.push({ x, y });
+        }
+
+        function generateSpecialFood() {
+            specialFood = generateFood();
+        }
+
+        function checkCollision(head) {
+            return snake.some(segment => segment.x === head.x && segment.y === head.y);
+        }
+
+        function checkObstacleCollision(head) {
+            return obstacles.some(obstacle => obstacle.x === head.x && obstacle.y === head.y);
+        }
+
+        function checkPowerUpCollision(head) {
+            powerUps.forEach((powerUp, index) => {
+                if (head.x === powerUp.x && head.y === powerUp.y) {
+                    // Apply power-up effect
+                    powerUps.splice(index, 1); // Remove the collected power-up
+                    applyPowerUpEffect();
+                }
+            });
+        }
+
+        function checkTeleporterCollision(head) {
+            teleporters.forEach((teleporter) => {
+                if (head.x === teleporter.x && head.y === teleporter.y) {
+                    // Teleport snake to a random location
+                    head.x = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+                    head.y = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
+                }
+            });
+        }
+
+        function checkSpecialFoodCollision(head) {
+            if (head.x === specialFood.x && head.y === specialFood.y) {
+                // Apply special food effect
+                specialFood = { x: -1, y: -1 }; // Remove the special food
+                applySpecialFoodEffect();
+            }
+        }
+
+        function applyPowerUpEffect() {
+            // Example: Increase snake length
+            snake.push({ ...snake[snake.length - 1] });
+        }
+
+        function applySpecialFoodEffect() {
+            // Example: Double the score
+            score *= 2;
+            scoreDisplay.textContent = `Score: ${score} | Level: ${level}`;
+        }
+
+        function resetGame() {
+            snake.length = 1; // Reset snake to one segment
+            snake[0] = { x: 0, y: 0 }; // Reset snake position
+            direction = 'right'; // Reset direction
+            food = generateFood(); // Generate new food
+            score = 0;
+            level = 1;
+            speed = 150;
+            scoreDisplay.textContent = `Score: ${score} | Level: ${level}`;
+            obstacles = [];
+            powerUps = [];
+            teleporters = [];
+            specialFood = { x: -1, y: -1 };
+        }
+
+        function showGameOverScreen() {
+            gameOverScoreDisplay.textContent = `Your score: ${score} | Level reached: ${level}`;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        function restartGame() {
+            gameOverScreen.style.display = 'none';
+            resetGame();
+        }
+
+        // Handle keyboard input for snake direction
+        window.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                    if (direction !== 'down') direction = 'up';
+                    break;
+                case 'ArrowDown':
+                    if (direction !== 'up') direction = 'down';
+                    break;
+                case 'ArrowLeft':
+                    if (direction !== 'right') direction = 'left';
+                    break;
+                case 'ArrowRight':
+                    if (direction !== 'left') direction = 'right';
+                    break;
+            }
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            setTimeout(gameLoop, speed);
+        }
+
+        // Generate initial obstacles, power-ups, teleporters, and special food
+        for (let i = 0; i < 5; i++) {
+            generateObstacle();
+            generatePowerUp();
+            generateTeleporter();
+        }
+        generateSpecialFood();
+
+        gameLoop();
+    </script>
+</body>
+</html>
